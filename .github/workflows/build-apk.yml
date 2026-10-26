@@ -1,0 +1,54 @@
+name: build-apk
+
+on:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack project
+        run: unzip -q graff_serverless.zip
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Android project
+        working-directory: gs
+        run: flutter create --org app.graff --project-name graff --platforms=android .
+
+      - name: Add Tor
+        working-directory: gs
+        run: python3 tool/prepare_android.py
+
+      - name: Get packages
+        working-directory: gs
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: gs
+        continue-on-error: true
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Tests
+        working-directory: gs
+        continue-on-error: true
+        run: flutter test
+
+      - name: Build APK
+        working-directory: gs
+        run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: graff-apk
+          path: gs/build/app/outputs/flutter-apk/app-release.apk
